@@ -61,24 +61,27 @@ class NaivePreprocessor(BasePreprocessor):
 class TensorPreprocessor:
     def run(self, train_data, valid_data):
 
-        y_train, x_train = train_data
-        y_valid, x_valid = valid_data
+        x_train, y_train = self._run_data(train_data)
+        x_valid, y_valid = self._run_data(valid_data)
 
-        x_train[np.isnan(x_train)] = 0
-        y_train[np.isnan(y_train)] = 0
-        x_valid[np.isnan(x_valid)] = 0
-        y_valid[np.isnan(y_valid)] = 0
-
+        # set timesteps,repeat over N axis
         timesteps_train = np.arange(y_train.shape[1])
         timesteps_valid = np.arange(y_valid.shape[1])
-        # repeat over N axis
         timesteps_train = timesteps_train.reshape(1, -1).repeat(len(y_train), 0)
         timesteps_valid = timesteps_valid.reshape(1, -1).repeat(len(y_valid), 0)
 
         return x_train, x_valid, timesteps_train, timesteps_valid, y_train, y_valid
 
-    def run_inference(self, valid_data, train_data=None):
-        raise NotImplementedError
+    def run_inference(self, x):
+        x[np.isnan(x)] = 0
+        return x
 
-    def run_train(self, df):
-        raise NotImplementedError
+    def run_train(self, data):
+        return self._run_data(data)
+
+    def _run_data(self, data):
+        y, x = data
+        # this has to be reviewed :/
+        x[np.isnan(x)] = 0
+        y[np.isnan(y)] = 0
+        return x, y
