@@ -12,6 +12,10 @@ lightgbm = "^3.3.2"
 dask = "^2022.3.0"
 cPython = "^0.0.6"
 Cython = "^0.29.28"
+xarray = "^2022.3.0"
+fastprogress = "^1.0.2"
+tqdm = "^4.63.1"
+mlflow = "^1.24.0"
 
 [tool.poetry.dev-dependencies]
 
