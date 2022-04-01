@@ -3,9 +3,10 @@ import numpy as np
 
 
 class TimeCrossValidator:
-    def __init__(self, n_folds=5, n_timesteps_per_fold=100):
+    def __init__(self, n_folds=5, n_timesteps_per_fold=100, n_timesteps_to_train=500):
         self.n_folds = n_folds
         self.n_timesteps_per_fold = n_timesteps_per_fold
+        self.n_timesteps_to_train = n_timesteps_to_train
 
     def run(self, data, model, preprocessor):
         scores = {
@@ -34,6 +35,11 @@ class TimeCrossValidator:
             valid_data = data[
                 (data.time_id > last_train) & (data.time_id <= last_valid)
             ]
+            if self.n_timesteps_to_train is not None:
+
+                time_ids = sorted(train_data.time_id.unique())
+                start_time_id = time_ids[-self.n_timesteps_to_train]
+                train_data = train_data[train_data.time_id > start_time_id]
 
             (
                 x_train,
