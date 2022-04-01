@@ -16,6 +16,7 @@ xarray = "^2022.3.0"
 fastprogress = "^1.0.2"
 tqdm = "^4.63.1"
 mlflow = "^1.24.0"
+torch = "^1.11.0"
 
 [tool.poetry.dev-dependencies]
 
