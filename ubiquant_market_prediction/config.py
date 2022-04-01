@@ -5,11 +5,14 @@ class ValidationConfig:
         },
         "preprocessing": {
             "preprocessor_type": "naive",
-            "preprocessor_args": {},
+            "preprocessor_args": {"cols_to_drop": ["time_id"]},
         },
         "model": {
-            "model_type": "random",
-            "model_args": {},
+            "model_type": "lightgbm",
+            "model_args": {
+                "categorical_feature": ["investment_id"],
+                "num_iterations": 100,
+            },
         },
         "validator_args": {
             "n_folds": 5,
