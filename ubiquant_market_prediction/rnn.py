@@ -18,10 +18,12 @@ class RNNArch(nn.Module):
         hidden_size=32,
         num_layers=1,
         dropout_prob=0.1,
+        activation_type="leakyrelu",
+        rnn_type="LSTM",
     ):
         super(RNNArch, self).__init__()
         # Initialize RNN
-        self.rnn = nn.LSTM(
+        self.rnn = getattr(nn, rnn_type)(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
@@ -32,7 +34,7 @@ class RNNArch(nn.Module):
         # Initialize Regressor
         layers = []
         layers.append(nn.Linear(hidden_size, hidden_size))
-        layers.append(nn.LeakyReLU(0.02))
+        layers.append(get_activation(activation_type))
         if dropout_prob > 0:
             layers.append(nn.Dropout(dropout_prob))
         layers.append(nn.Linear(hidden_size, 1))
@@ -45,6 +47,16 @@ class RNNArch(nn.Module):
         # The following line is doing: N,T,F_hidden --> NT, F_hidden --> N,T,F_out
         out_reg = self.regressor(out_rnn.reshape([N * T, -1])).reshape([N, T, -1])
         return out_reg.squeeze(-1), h_state
+
+
+def get_activation(activation_type):
+    if activation_type.lower() == "leakyrelu":
+        return nn.LeakyReLU(0.02)
+    if activation_type.lower() == "silu":
+        return nn.SiLU()
+    if activation_type.lower() == "mish":
+        return nn.Mish()
+    raise ValueError(f"Unknown activation type {activation_type}")
 
 
 def to_numpy(x):
