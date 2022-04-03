@@ -61,8 +61,8 @@ class NaivePreprocessor(BasePreprocessor):
 class TensorPreprocessor:
     def run(self, train_data, valid_data):
 
-        x_train, y_train = self._run_data(train_data)
-        x_valid, y_valid = self._run_data(valid_data)
+        x_train, y_train = self._run_data(train_data, copy=True)
+        x_valid, y_valid = self._run_data(valid_data, copy=True)
 
         # set timesteps,repeat over N axis
         timesteps_train = np.arange(y_train.shape[1])
@@ -79,8 +79,11 @@ class TensorPreprocessor:
     def run_train(self, data):
         return self._run_data(data)
 
-    def _run_data(self, data):
+    def _run_data(self, data, copy=False):
         y, x = data
+        if copy:
+            x = x.copy()
+            y = y.copy()
         # this has to be reviewed :/
         x[np.isnan(x)] = 0
         y[np.isnan(y)] = 0
