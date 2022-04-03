@@ -63,6 +63,9 @@ class TimeCrossValidator:
             else:
                 y_valid_pred = model.predict(x_valid)
 
+            y_train_pred = preprocessor.inverse_transform(y_train_pred)
+            y_valid_pred = preprocessor.inverse_transform(y_valid_pred)
+
             score_train = compute_avg_pearson_by_timestep(
                 y_train, y_train_pred, timesteps_train
             )
