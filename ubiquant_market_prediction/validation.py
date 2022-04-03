@@ -54,8 +54,8 @@ class TimeCrossValidator:
                 y_valid_pred = model.predict(x_valid, x_train)
 
                 # reshape to compute score
-                y_train = y_train.reshape(-1)
-                y_valid = y_valid.reshape(-1)
+                y_train = train_data[0].reshape(-1)
+                y_valid = valid_data[0].reshape(-1)
                 y_train_pred = y_train_pred.reshape(-1)
                 y_valid_pred = y_valid_pred.reshape(-1)
                 timesteps_train = timesteps_train.reshape(-1)
