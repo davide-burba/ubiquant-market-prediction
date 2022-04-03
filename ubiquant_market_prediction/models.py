@@ -94,11 +94,11 @@ class RNNModel:
             drop_last=False,
         )
 
-        self.training_error = []
+        self.training_loss_value = []
 
         for epoch in range(self.num_epochs):
             print(f"epoch {epoch+1}/{self.num_epochs}")
-            epoch_error = []
+            epoch_loss_value = []
             if self.window_sizes is not None:
                 window_size = self.window_sizes[epoch % len(self.window_sizes)]
             else:
@@ -116,23 +116,27 @@ class RNNModel:
 
                     assert y_batch_t.shape == pred.shape
 
+                    drop_na_mask = ~y_batch_t.isnan()
+                    error = y_batch_t[drop_na_mask] - pred[drop_na_mask]
+
                     if self.objective == "mae":
-                        error = torch.mean(torch.abs(y_batch_t - pred))
+                        loss_value = torch.mean(torch.abs(error))
                     elif self.objective == "mse":
-                        error = torch.mean((y_batch_t - pred) ** 2)
+                        loss_value = torch.mean((error) ** 2)
 
                     # Run the optimizer
                     self.optimizer.zero_grad()
-                    error.backward()
+                    loss_value.backward()
                     self.optimizer.step()
-                    epoch_error.append(error.item())
+                    epoch_loss_value.append(loss_value.item())
 
             # store the epoch loss
-            self.training_error.append(np.mean(epoch_error))
-            print(f"Epoch loss: {np.mean(epoch_error):.4f}")
+            epoch_loss_value = np.mean(epoch_loss_value)
+            self.training_loss_value.append(epoch_loss_value)
+            print(f"Epoch loss: {epoch_loss_value:.4f}")
 
     def predict(self, x, x_past=None):
-        
+
         if x_past is not None:
             _, h_state = self._predict(x_past)
         else:
