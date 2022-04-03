@@ -118,3 +118,18 @@ class CustomScaler:
         y_invtrans = self.y_scaler.inverse_transform(y.transpose(1, 0)).transpose(1, 0)
         # X_invtrans = np.stack([self.X_scaler[i].inverse_transform(X[i]) for i in range(X.shape[0])])
         return y_invtrans
+
+
+def corr_loss(targ, pred):
+    targ_mean = targ.mean(axis=0)
+    pred_mean = pred.mean(axis=0)
+    num = ((targ - targ_mean) * (pred - pred_mean)).sum(axis=0)
+    den = (
+        ((targ - targ_mean) ** 2).sum(axis=0) * ((pred - pred_mean) ** 2).sum(axis=0)
+    ) ** 0.5
+    avg_corr = (num / den).mean()
+    return 1 - avg_corr
+
+
+def corr_exp_loss(targ,pred):
+    return torch.exp(corr_loss(targ,pred))

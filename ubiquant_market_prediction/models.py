@@ -3,7 +3,15 @@ import lightgbm as lgb
 import numpy as np
 from torch.utils.data import DataLoader
 import torch
-from rnn import RNNArch, TimeSplitter, TensorLoader, to_numpy, to_tensor
+from rnn import (
+    RNNArch,
+    TimeSplitter,
+    TensorLoader,
+    to_numpy,
+    to_tensor,
+    corr_loss,
+    corr_exp_loss,
+)
 
 
 def get_model(model_type, model_args):
@@ -116,13 +124,22 @@ class RNNModel:
 
                     assert y_batch_t.shape == pred.shape
 
-                    drop_na_mask = ~y_batch_t.isnan()
-                    error = y_batch_t[drop_na_mask] - pred[drop_na_mask]
+                    if self.objective not in {"corr","corr_exp"}:
+                        drop_na_mask = ~y_batch_t.isnan()
+                        y_batch_t = y_batch_t[drop_na_mask]
+                        pred = pred[drop_na_mask]
+                        error = y_batch_t[drop_na_mask] - pred[drop_na_mask]
 
                     if self.objective == "mae":
                         loss_value = torch.mean(torch.abs(error))
                     elif self.objective == "mse":
                         loss_value = torch.mean((error) ** 2)
+                    elif self.objective == "corr":
+                        loss_value = corr_loss(y_batch_t, pred)
+                    elif self.objective == "corr_exp":
+                        loss_value = corr_exp_loss(y_batch_t, pred)
+                    else:
+                        raise ValueError(f"Unknown objective {self.objective}")
 
                     # Run the optimizer
                     self.optimizer.zero_grad()
