@@ -2,7 +2,7 @@ class ValidationConfig:
     default_config_dict = {
         "loading": {
             "add_supplemental": False,
-            "tensor_like": True,
+            "tensor_like": False,
         },
         "preprocessing": {
             "preprocessor_type": "naive",
