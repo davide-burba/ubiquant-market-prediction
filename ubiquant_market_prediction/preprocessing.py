@@ -59,6 +59,9 @@ class NaivePreprocessor(BasePreprocessor):
 
 
 class TensorPreprocessor:
+    def __init__(self, fill_na_target=False):
+        self.fill_na_target = fill_na_target
+
     def run(self, train_data, valid_data):
 
         x_train, y_train = self._run_data(train_data, copy=True)
@@ -84,7 +87,7 @@ class TensorPreprocessor:
         if copy:
             x = x.copy()
             y = y.copy()
-        # this has to be reviewed :/
         x[np.isnan(x)] = 0
-        y[np.isnan(y)] = 0
+        if self.fill_na_target:
+            y[np.isnan(y)] = 0
         return x, y

@@ -116,10 +116,13 @@ class RNNModel:
 
                     assert y_batch_t.shape == pred.shape
 
+                    drop_na_mask = ~y_batch_t.isnan()
+                    error = y_batch_t[drop_na_mask] - pred[drop_na_mask]
+
                     if self.objective == "mae":
-                        loss_value = torch.mean(torch.abs(y_batch_t - pred))
+                        loss_value = torch.mean(torch.abs(error))
                     elif self.objective == "mse":
-                        loss_value = torch.mean((y_batch_t - pred) ** 2)
+                        loss_value = torch.mean((error) ** 2)
 
                     # Run the optimizer
                     self.optimizer.zero_grad()
