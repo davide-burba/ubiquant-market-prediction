@@ -2,6 +2,7 @@ class ValidationConfig:
     default_config_dict = {
         "loading": {
             "add_supplemental": False,
+            "tensor_like": False,
         },
         "preprocessing": {
             "preprocessor_type": "naive",
@@ -15,8 +16,10 @@ class ValidationConfig:
             },
         },
         "validator_args": {
-            "n_folds": 5,
-            "n_timesteps_per_fold": 100,
+            "n_folds": 3,
+            "n_timesteps_per_fold": 200,
+            "n_timesteps_to_train": 600,
+            "tensor_like": False,
         },
     }
 

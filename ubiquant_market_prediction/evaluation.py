@@ -14,5 +14,6 @@ def compute_pearson_by_timestep(targets, predictions, timesteps):
             "timesteps": timesteps,
         }
     )
+    preds_df = preds_df.dropna()
     corr_df = preds_df.groupby("timesteps").corr()
     return corr_df.targets.xs("predictions", level=1).fillna(-1)
