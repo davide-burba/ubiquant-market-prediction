@@ -59,7 +59,7 @@ class NaivePreprocessor(BasePreprocessor):
 
 
 class TensorPreprocessor:
-    def __init__(self, fill_na_target=False):
+    def __init__(self, fill_na_target=True):
         self.fill_na_target = fill_na_target
 
     def run(self, train_data, valid_data):
