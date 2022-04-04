@@ -1,8 +1,6 @@
 import torch.nn as nn
-from torch.utils.data import DataLoader
 import torch
 import numpy as np
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, QuantileTransformer
 
 
 class RNNArch(nn.Module):
@@ -99,25 +97,6 @@ class TimeSplitter:
 
     def __getitem__(self, index):
         return self.X_chunked[index], self.y_chunked[index]
-
-
-class CustomScaler:
-    def fit(self, X, y):
-        self.y_scaler = MinMaxScaler().fit(y.transpose(1, 0))
-        self.X_scaler = [MinMaxScaler().fit(X[i]) for i in range(X.shape[0])]
-
-    def transform(self, X, y):
-        y_trans = self.y_scaler.transform(y.transpose(1, 0)).transpose(1, 0)
-        X_trans = np.stack(
-            [self.X_scaler[i].transform(X[i]) for i in range(X.shape[0])]
-        )
-        return X_trans, y_trans
-
-    def inverse_transform(self, y):
-        """no need to inverse transform X"""
-        y_invtrans = self.y_scaler.inverse_transform(y.transpose(1, 0)).transpose(1, 0)
-        # X_invtrans = np.stack([self.X_scaler[i].inverse_transform(X[i]) for i in range(X.shape[0])])
-        return y_invtrans
 
 
 def corr_loss(targ, pred):
