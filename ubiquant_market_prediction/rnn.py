@@ -18,8 +18,24 @@ class RNNArch(nn.Module):
         dropout_prob=0.1,
         activation_type="leakyrelu",
         rnn_type="LSTM",
+        use_attention=False,
+        attention_hidden_sizes=[8],
     ):
         super(RNNArch, self).__init__()
+
+        self.use_attention = use_attention
+        if self.use_attention:
+            self.attention_layer = []
+            prev_size = input_size
+            for size in attention_hidden_sizes:
+                self.attention_layer.append(nn.Linear(prev_size, size))
+                self.attention_layer.append(get_activation(activation_type))
+                prev_size = size
+            
+            self.attention_layer.append(nn.Linear(prev_size, input_size))
+            self.attention_layer.append(nn.Sigmoid())
+            self.attention_layer = nn.Sequential(*self.attention_layer)
+
         # Initialize RNN
         self.rnn = getattr(nn, rnn_type)(
             input_size=input_size,
@@ -39,10 +55,15 @@ class RNNArch(nn.Module):
         self.regressor = nn.Sequential(*layers)
 
     def forward(self, x, h_state=None):
-        N, T, F = x.shape
+
+        if self.use_attention:
+            x = x * self.attention_layer(x)
+
         # RNN
         out_rnn, h_state = self.rnn(x, h_state)
+
         # The following line is doing: N,T,F_hidden --> NT, F_hidden --> N,T,F_out
+        N, T, _ = x.shape
         out_reg = self.regressor(out_rnn.reshape([N * T, -1])).reshape([N, T, -1])
         return out_reg.squeeze(-1), h_state
 
@@ -110,5 +131,5 @@ def corr_loss(targ, pred):
     return 1 - avg_corr
 
 
-def corr_exp_loss(targ,pred):
-    return torch.exp(corr_loss(targ,pred))
+def corr_exp_loss(targ, pred):
+    return torch.exp(corr_loss(targ, pred))
