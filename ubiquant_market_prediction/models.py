@@ -93,10 +93,10 @@ class RNNModel:
             weight_decay=self.weight_decay,
         )
 
-    def fit(self, X_train, y_train):
-        # Define the loader using X_train, y_train
+    def fit(self, x_train, y_train):
+        # Define the loader using x_train, y_train
         loader = DataLoader(
-            dataset=TensorLoader(X_train, y_train),
+            dataset=TensorLoader(x_train, y_train),
             batch_size=self.batch_size,
             shuffle=True,
             drop_last=False,
@@ -110,13 +110,13 @@ class RNNModel:
             if self.window_sizes is not None:
                 window_size = self.window_sizes[epoch % len(self.window_sizes)]
             else:
-                window_size = X_train.shape[1]  # Use all T
+                window_size = x_train.shape[1]  # Use all T
 
-            for X_batch, y_batch in loader:
-                timesplitter = TimeSplitter(X_batch, y_batch, window_size)
-                for X_batch_t, y_batch_t in timesplitter:
+            for x_batch, y_batch in loader:
+                timesplitter = TimeSplitter(x_batch, y_batch, window_size)
+                for x_batch_t, y_batch_t in timesplitter:
 
-                    pred, _ = self.engine(X_batch_t)
+                    pred, _ = self.engine(x_batch_t)
 
                     if not self.train_on_sequence:
                         pred = pred[:, -1]
@@ -124,7 +124,7 @@ class RNNModel:
 
                     assert y_batch_t.shape == pred.shape
 
-                    if self.objective not in {"corr","corr_exp"}:
+                    if self.objective not in {"corr", "corr_exp"}:
                         drop_na_mask = ~y_batch_t.isnan()
                         y_batch_t = y_batch_t[drop_na_mask]
                         pred = pred[drop_na_mask]
@@ -162,14 +162,14 @@ class RNNModel:
         return y_pred
 
     def _predict(
-        self, X, h_state=None, return_intermediate_pred=True, return_states=True
+        self, x, h_state=None, return_intermediate_pred=True, return_states=True
     ):
         self.engine.eval()
-        # Convert X to tensor
-        X = to_tensor(X)
+        # Convert x to tensor
+        x = to_tensor(x)
         # Get the predictions --> convert the predictions to numpy
         with torch.no_grad():
-            prediction, h_state = self.engine(X, h_state)
+            prediction, h_state = self.engine(x, h_state)
             prediction = to_numpy(prediction)
         self.engine.train()
         if not return_intermediate_pred:

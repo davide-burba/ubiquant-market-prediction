@@ -38,10 +38,10 @@ class RNNArch(nn.Module):
         layers.append(nn.Linear(hidden_size, 1))
         self.regressor = nn.Sequential(*layers)
 
-    def forward(self, X, h_state=None):
-        N, T, F = X.shape
+    def forward(self, x, h_state=None):
+        N, T, F = x.shape
         # RNN
-        out_rnn, h_state = self.rnn(X, h_state)
+        out_rnn, h_state = self.rnn(x, h_state)
         # The following line is doing: N,T,F_hidden --> NT, F_hidden --> N,T,F_out
         out_reg = self.regressor(out_rnn.reshape([N * T, -1])).reshape([N, T, -1])
         return out_reg.squeeze(-1), h_state
@@ -68,35 +68,35 @@ def to_tensor(x):
 
 
 class TensorLoader:
-    def __init__(self, X, y):
-        self.X = X.astype("float32")
+    def __init__(self, x, y):
+        self.x = x.astype("float32")
         self.y = y.astype("float32")
 
     def __len__(self):
-        return len(self.X)
+        return len(self.x)
 
     def __getitem__(self, index):
-        X = to_tensor(self.X[index])
+        x = to_tensor(self.x[index])
         y = to_tensor(self.y[index])
-        return X, y
+        return x, y
 
 
 class TimeSplitter:
-    def __init__(self, X, y, window_size):
-        N, T, F = X.shape
-        self.X_chunked = []
+    def __init__(self, x, y, window_size):
+        N, T, F = x.shape
+        self.x_chunked = []
         self.y_chunked = []
         for start_t in range(0, T, window_size):  # this could be rolling!!!!
             end_t = start_t + window_size
-            self.X_chunked.append(X[:, start_t:end_t])
+            self.x_chunked.append(x[:, start_t:end_t])
             self.y_chunked.append(y[:, start_t:end_t])
-        self.order = np.arange(len(self.X_chunked))
+        self.order = np.arange(len(self.x_chunked))
 
     def __len__(self):
         return len(self.order)
 
     def __getitem__(self, index):
-        return self.X_chunked[index], self.y_chunked[index]
+        return self.x_chunked[index], self.y_chunked[index]
 
 
 def corr_loss(targ, pred):
