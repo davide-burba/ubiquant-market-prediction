@@ -3,11 +3,115 @@ import torch
 import numpy as np
 
 
+class NNArch(nn.Module):
+    def _set_embedding(
+        self,
+        input_size,
+        use_embedding=False,
+        embedding_dim_list=None,
+        num_embeddings_list=None,
+    ):
+        self.use_embedding = use_embedding
+        if not self.use_embedding:
+            return input_size
+
+        assert isinstance(embedding_dim_list, list)
+        assert isinstance(num_embeddings_list, list)
+        assert len(embedding_dim_list) == len(num_embeddings_list)
+
+        self.embedding_layers = []
+        for embedding_dim, num_embeddings in zip(
+            embedding_dim_list, num_embeddings_list
+        ):
+            embedding_layer = nn.Embedding(
+                num_embeddings=num_embeddings,
+                embedding_dim=embedding_dim,
+            )
+            self.embedding_layers.append(embedding_layer)
+        # update input size based on embedding sizes
+        input_size = input_size + sum(embedding_dim_list) - len(embedding_dim_list)
+        return input_size
+
+    def _set_attention(self,
+        input_size,
+        use_attention=False,
+        attention_hidden_sizes=[8],
+        activation_type="leakyrelu",
+    ):
+        self.use_attention = use_attention
+        if self.use_attention:
+            self.attention_layer = []
+            prev_size = input_size
+            for size in attention_hidden_sizes:
+                self.attention_layer.append(nn.Linear(prev_size, size))
+                self.attention_layer.append(get_activation(activation_type))
+                prev_size = size
+
+            self.attention_layer.append(nn.Linear(prev_size, input_size))
+            self.attention_layer.append(nn.Sigmoid())
+            self.attention_layer = nn.Sequential(*self.attention_layer)
+
+
+class MLPArch(NNArch):
+    def __init__(
+        self,
+        input_size,
+        hidden_sizes=[32, 16, 8],
+        dropout_prob=0.1,
+        activation_type="leakyrelu",
+        use_attention=False,
+        attention_hidden_sizes=[8],
+        use_embedding=False,
+        embedding_dim_list=None,
+        num_embeddings_list=None,
+    ):
+        super(MLPArch, self).__init__()
+
+        input_size = self._set_embedding(
+            input_size,
+            use_embedding,
+            embedding_dim_list,
+            num_embeddings_list,
+        )
+        self._set_attention(
+            input_size,
+            use_attention,
+            attention_hidden_sizes,
+            activation_type,
+        )
+        # Initialize Regressor
+        layers = []
+        past_size = input_size
+        for size in hidden_sizes:
+            layers.append(nn.Linear(past_size, size))
+            layers.append(get_activation(activation_type))
+            if dropout_prob > 0:
+                layers.append(nn.Dropout(dropout_prob))
+            past_size = size
+        layers.append(nn.Linear(past_size, 1))
+        self.regressor = nn.Sequential(*layers)
+
+    def forward(self, x):
+
+        if self.use_embedding:
+            embedded_features = []
+            for i, embedding_layer in enumerate(self.embedding_layers):
+                cat_feat = x[:, i].int()
+                emb_feat = embedding_layer(cat_feat)
+                embedded_features.append(emb_feat)
+            embedded_features = torch.cat(embedded_features, 1)
+            x = torch.cat([embedded_features, x[:, len(self.embedding_layers) :]], 1)
+
+        if self.use_attention:
+            x = x * self.attention_layer(x)
+
+        return self.regressor(x).squeeze(-1)
+
+
 class RNNArch(nn.Module):
     """
-    input and output tensors are provided as (batch, seq, feature)
+    Input and output tensors are provided as (batch, seq, feature)
     """
-
     DEFAULTS = {}
 
     def __init__(
