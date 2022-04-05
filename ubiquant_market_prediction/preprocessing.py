@@ -32,12 +32,26 @@ class BasePreprocessor:
 
 
 class NaivePreprocessor(BasePreprocessor):
-    def __init__(self, cols_to_drop=[]):
+    def __init__(
+        self,
+        cols_to_drop=[],
+        scaler_features=None,
+        scaler_features_args={},
+        crop_low=None,
+        crop_high=None,
+    ):
         self.cols_to_drop = cols_to_drop
+        self.crop_low = crop_low
+        self.crop_high = crop_high
+        if scaler_features is not None:
+            scaler_featues = getattr(sklearn.preprocessing, scaler_features)(
+                **scaler_features_args
+            )
+        self.scaler_features = scaler_features
 
     def run(self, train_data, valid_data):
 
-        x_train, y_train = self.run_train(train_data)
+        x_train, y_train = self.run_train(train_data, fit_scaler=True)
         x_valid = self.run_inference(valid_data)
 
         timesteps_train = train_data.time_id.values
@@ -51,15 +65,27 @@ class NaivePreprocessor(BasePreprocessor):
         return self._run(valid_data)
 
     def run_train(self, train_data):
-        x_train = self._run(train_data)
+        x_train = self._run(train_data, fit_scaler=True)
         y_train = train_data.target.values
+
+        if self.crop_high is not None:
+            y_train[y_train > self.crop_high] = self.crop_high
+        if self.crop_low is not None:
+            y_train[y_train < self.crop_low] = self.crop_low
+
         return x_train, y_train
 
-    def _run(self, df):
+    def _run(self, df, fit_scaler=False):
         cols_to_drop = ["row_id"] + self.cols_to_drop
         if "target" in df.columns:
             cols_to_drop.append("target")
-        return df.drop(columns=cols_to_drop)
+        df = df.drop(columns=cols_to_drop)
+
+        if self.scaler_features is not None:
+            if fit_scaler:
+                self.scaler_features.fit(df)
+            df = self.scaler_features.transform(df)
+        return df
 
 
 class TensorPreprocessor(BasePreprocessor):
