@@ -7,7 +7,12 @@ import torch
 
 
 def run_inference_rnn(
-    test_df, model, preprocessor, hidden_state_helper, keep_investment_id=False
+    test_df,
+    model,
+    preprocessor,
+    hidden_state_helper,
+    keep_investment_id=False,
+    update_state_during_inference=True,
 ):
     test_df = test_df.fillna(0)
     (
@@ -17,7 +22,12 @@ def run_inference_rnn(
     ) = _build_tensor_features(test_df, keep_investment_id)
 
     y_pred = _build_prediction_tensor(
-        test_features, test_investment_ids, model, preprocessor, hidden_state_helper
+        test_features,
+        test_investment_ids,
+        model,
+        preprocessor,
+        hidden_state_helper,
+        update_state_during_inference,
     )
 
     predictions = _pred_tensor_to_list(
@@ -39,13 +49,19 @@ def _build_tensor_features(test_df, keep_investment_id):
 
 
 def _build_prediction_tensor(
-    test_features, test_investment_ids, model, preprocessor, hidden_state_helper
+    test_features,
+    test_investment_ids,
+    model,
+    preprocessor,
+    hidden_state_helper,
+    update_state_during_inference,
 ):
 
     x_test = preprocessor.run_inference(test_features)
     h_state_prev = hidden_state_helper.get_hstate(test_investment_ids)
     y_pred, h_state = model._predict(x_test, h_state=h_state_prev)
-    hidden_state_helper.update_hstate(h_state, test_investment_ids)
+    if update_state_during_inference:
+        hidden_state_helper.update_hstate(h_state, test_investment_ids)
     return y_pred
 
 
