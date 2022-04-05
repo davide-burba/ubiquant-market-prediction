@@ -92,9 +92,18 @@ if __name__ == "__main__":
     mlflow.set_experiment(args.mlflow_experiment)
     mlflow.log_param("run_dir", run_dir)
     mlflow.log_param("model_type", config["model"]["model_type"])
-    mlflow.log_params(config["model"]["model_args"])
+
+    for k,v in config["model"]["model_args"].items():
+        if isinstance(v,dict):
+            for kk,vv in v.items():
+                mlflow.log_param(kk,vv)
+        mlflow.log_param(k,v)
+    
     mlflow.log_param("preprocessor_type", config["preprocessing"]["preprocessor_type"])
     mlflow.log_params(config["preprocessing"]["preprocessor_args"])
+    mlflow.log_params(config["validator_args"])
+
+
     for mode in ["valid", "train"]:
         mlflow.log_metric(f"score_{mode}", scores[f"score_{mode}"])
         for step, score in enumerate(scores[f"cv_scores_{mode}"]):
