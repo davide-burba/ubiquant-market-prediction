@@ -1,14 +1,20 @@
+"""
+Helper module to manage interaction with ubiquant api
+"""
+
 import numpy as np
-import pandas as pd
 import torch
 
 
-def run_inference(test_df, model, preprocessor, hidden_state_helper):
+def run_inference_rnn(
+    test_df, model, preprocessor, hidden_state_helper, keep_investment_id=False
+):
+    test_df = test_df.fillna(0)
     (
         test_features,
         test_investment_ids,
         test_timesteps,
-    ) = _build_tensor_features(test_df)
+    ) = _build_tensor_features(test_df, keep_investment_id)
 
     y_pred = _build_prediction_tensor(
         test_features, test_investment_ids, model, preprocessor, hidden_state_helper
@@ -20,12 +26,14 @@ def run_inference(test_df, model, preprocessor, hidden_state_helper):
     return predictions
 
 
-def _build_tensor_features(test_df):
+def _build_tensor_features(test_df, keep_investment_id):
     test_df["time_id"] = test_df.row_id.str.split("_", expand=True)[0].astype(int)
-    test_investment_ids = sorted(test_df.investment_id.unique())
+    test_investment_ids = np.array(sorted(test_df.investment_id.unique()))
     test_timesteps = np.array(sorted(test_df.time_id.unique()))
 
-    test_features = _df_to_tensor(test_df, test_investment_ids, test_timesteps)
+    test_features = _df_to_tensor(
+        test_df, test_investment_ids, test_timesteps, keep_investment_id
+    )
 
     return test_features, test_investment_ids, test_timesteps
 
@@ -55,12 +63,14 @@ def _pred_tensor_to_list(test_df, y_pred, test_investment_ids, test_timesteps):
     return predictions
 
 
-def _df_to_tensor(df, investment_ids, timesteps):
+def _df_to_tensor(df, investment_ids, timesteps, keep_investment_id):
     df = df.drop(columns="row_id").set_index(["investment_id", "time_id"])
 
     features = []
     for investment_id in investment_ids:
         df_inv = df.loc[investment_id].reindex(timesteps)
+        if keep_investment_id:
+            df_inv.insert(0, "investment_id", investment_id)
         features.append(np.expand_dims(df_inv.values, 0))
 
     features = np.concatenate(features, axis=0)
@@ -68,12 +78,13 @@ def _df_to_tensor(df, investment_ids, timesteps):
 
 
 class HiddenStateHelper:
-    def __init__(self, h_state, investment_ids):
+    def __init__(self, h_state, investment_ids, initialize_inv_id=True):
 
         self.d1, _, self.d3 = h_state[0].shape
         self._h1 = {}
         self._h2 = {}
-        self.update_hstate(h_state, investment_ids)
+        if initialize_inv_id:
+            self.update_hstate(h_state, investment_ids)
 
     def update_hstate(self, h_state, investment_ids):
         h1, h2 = h_state
