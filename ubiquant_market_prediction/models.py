@@ -206,6 +206,7 @@ class RNNModel(BaseModel):
         learning_rate=1e-3,
         weight_decay=0.01,
         embedding_dim_list=None,
+        stateful_pred=True,
         random_state=123,
     ):
 
@@ -218,6 +219,7 @@ class RNNModel(BaseModel):
         self.weight_decay = weight_decay
         self.embedding_dim_list = embedding_dim_list
         self.rnn_params = rnn_params
+        self.stateful_pred = stateful_pred
 
         torch.manual_seed(random_state)
         np.random.seed(random_state)
@@ -332,10 +334,10 @@ class RNNModel(BaseModel):
 
     def predict(self, x, x_past=None):
 
-        if x_past is not None:
-            _, h_state = self._predict(x_past)
-        else:
+        if x_past is None or not self.stateful_pred:
             h_state = None
+        else:
+            _, h_state = self._predict(x_past)
         y_pred, _ = self._predict(x, h_state)
         return y_pred
 
