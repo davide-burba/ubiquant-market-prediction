@@ -20,8 +20,29 @@ class RNNArch(nn.Module):
         rnn_type="LSTM",
         use_attention=False,
         attention_hidden_sizes=[8],
+        use_embedding=False,
+        embedding_dim_list=None,
+        num_embeddings_list=None,
     ):
         super(RNNArch, self).__init__()
+
+        self.use_embedding = use_embedding
+        if self.use_embedding:
+            assert isinstance(embedding_dim_list, list)
+            assert isinstance(num_embeddings_list, list)
+            assert len(embedding_dim_list) == len(num_embeddings_list)
+
+            self.embedding_layers = []
+            for embedding_dim, num_embeddings in zip(
+                embedding_dim_list, num_embeddings_list
+            ):
+                embedding_layer = nn.Embedding(
+                    num_embeddings=num_embeddings,
+                    embedding_dim=embedding_dim,
+                )
+                self.embedding_layers.append(embedding_layer)
+            # update input size based on embedding sizes
+            input_size = input_size + sum(embedding_dim_list) - len(embedding_dim_list)
 
         self.use_attention = use_attention
         if self.use_attention:
@@ -31,7 +52,7 @@ class RNNArch(nn.Module):
                 self.attention_layer.append(nn.Linear(prev_size, size))
                 self.attention_layer.append(get_activation(activation_type))
                 prev_size = size
-            
+
             self.attention_layer.append(nn.Linear(prev_size, input_size))
             self.attention_layer.append(nn.Sigmoid())
             self.attention_layer = nn.Sequential(*self.attention_layer)
@@ -55,6 +76,15 @@ class RNNArch(nn.Module):
         self.regressor = nn.Sequential(*layers)
 
     def forward(self, x, h_state=None):
+
+        if self.use_embedding:
+            embedded_features = []
+            for i, embedding_layer in enumerate(self.embedding_layers):
+                cat_feat = x[:, :, i].int()
+                emb_feat = embedding_layer(cat_feat)
+                embedded_features.append(emb_feat)
+            embedded_features = torch.cat(embedded_features, 2)
+            x = torch.cat([embedded_features, x[:, :, len(self.embedding_layers) :]], 2)
 
         if self.use_attention:
             x = x * self.attention_layer(x)
