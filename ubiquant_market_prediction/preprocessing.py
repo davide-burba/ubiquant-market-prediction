@@ -44,14 +44,14 @@ class NaivePreprocessor(BasePreprocessor):
         self.crop_low = crop_low
         self.crop_high = crop_high
         if scaler_features is not None:
-            scaler_featues = getattr(sklearn.preprocessing, scaler_features)(
+            scaler_features = getattr(sklearn.preprocessing, scaler_features)(
                 **scaler_features_args
             )
         self.scaler_features = scaler_features
 
     def run(self, train_data, valid_data):
 
-        x_train, y_train = self.run_train(train_data, fit_scaler=True)
+        x_train, y_train = self.run_train(train_data)
         x_valid = self.run_inference(valid_data)
 
         timesteps_train = train_data.time_id.values
