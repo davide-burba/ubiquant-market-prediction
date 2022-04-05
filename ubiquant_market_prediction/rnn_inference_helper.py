@@ -1,9 +1,6 @@
-"""
-Helper module to manage interaction with ubiquant api
-"""
-
 import numpy as np
 import torch
+from copy import deepcopy
 
 
 def run_inference_rnn(
@@ -67,10 +64,10 @@ def _build_prediction_tensor(
 
 def _pred_tensor_to_list(test_df, y_pred, test_investment_ids, test_timesteps):
     predictions = []
-    for r in test_df.row_id:
+    for i, r in enumerate(test_df.row_id):
         time_id, investment_id = r.split("_")
         time_id = int(time_id)
-        investment_id = int(investment_id)
+        investment_id = test_df.iloc[i].investment_id.item()
 
         inv_idx = np.argwhere(test_investment_ids == investment_id).item()
         time_idx = np.argwhere(test_timesteps == time_id).item()
@@ -94,11 +91,14 @@ def _df_to_tensor(df, investment_ids, timesteps, keep_investment_id):
 
 
 class HiddenStateHelper:
-    def __init__(self, h_state, investment_ids, initialize_inv_id=True):
+    def __init__(
+        self, h_state, investment_ids, initialize_inv_id=True, h_state_default=None
+    ):
 
         self.d1, _, self.d3 = h_state[0].shape
         self._h1 = {}
         self._h2 = {}
+        self.h_state_default = h_state_default
         if initialize_inv_id:
             self.update_hstate(h_state, investment_ids)
 
@@ -116,11 +116,20 @@ class HiddenStateHelper:
                 h1.append(self._h1[inv_id])
                 h2.append(self._h2[inv_id])
             else:
-                h1.append(self._build_zero_state())
-                h2.append(self._build_zero_state())
+                _h1, _h2 = self.get_default_state()
+                h1.append(_h1)
+                h2.append(_h2)
         h1 = torch.cat(h1, dim=1)
         h2 = torch.cat(h2, dim=1)
         return (h1, h2)
+
+    def get_default_state(self):
+        if self.h_state_default is None:
+            _h1 = self._build_zero_state()
+            _h2 = self._build_zero_state()
+        else:
+            _h1, _h2 = deepcopy(self.h_state_default)
+        return _h1, _h2
 
     def _build_zero_state(self):
         return torch.zeros(self.d1, 1, self.d3)
