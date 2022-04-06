@@ -1,4 +1,5 @@
 from abc import abstractclassmethod
+import pandas as pd
 import numpy as np
 import sklearn
 
@@ -39,6 +40,7 @@ class NaivePreprocessor(BasePreprocessor):
         scaler_features_args={},
         crop_low=None,
         crop_high=None,
+        time_id_features=[],
     ):
         self.cols_to_drop = cols_to_drop
         self.crop_low = crop_low
@@ -48,6 +50,7 @@ class NaivePreprocessor(BasePreprocessor):
                 **scaler_features_args
             )
         self.scaler_features = scaler_features
+        self.time_id_features = time_id_features
 
     def run(self, train_data, valid_data):
 
@@ -76,6 +79,12 @@ class NaivePreprocessor(BasePreprocessor):
         return x_train, y_train
 
     def _run(self, df, fit_scaler=False):
+
+        if "time_id" not in df:
+            df["time_id"] = df.row_id.str.split("_", expand=True)[0].astype(int).values
+
+        df = self._add_time_features(df)
+
         cols_to_drop = ["row_id"] + self.cols_to_drop
         if "target" in df.columns:
             cols_to_drop.append("target")
@@ -85,6 +94,21 @@ class NaivePreprocessor(BasePreprocessor):
             if fit_scaler:
                 self.scaler_features.fit(df)
             df = self.scaler_features.transform(df)
+        return df
+
+    def _add_time_features(self, df):
+        if len(self.time_id_features) == 0:
+            return df
+
+        dgb = df.groupby("time_id")[self.time_id_features]
+        dgb_mean = dgb.mean()
+        dgb_std = dgb.std()
+        dgb_mean.columns = [f"time_mean_{c}" for c in self.time_id_features]
+        dgb_std.columns = [f"time_std_{c}" for c in self.time_id_features]
+        dgb_mean.reset_index(inplace=True)
+        dgb_std.reset_index(inplace=True)
+        df = pd.merge(df, dgb_mean, how="left", on="time_id")
+        df = pd.merge(df, dgb_std, how="left", on="time_id")
         return df
 
 
