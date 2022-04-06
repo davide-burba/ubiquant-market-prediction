@@ -240,6 +240,8 @@ class RNNModel(BaseModel):
             self.rnn_params["use_embedding"] = True
             self.rnn_params["num_embeddings_list"] = self.num_embeddings_list
             self.rnn_params["embedding_dim_list"] = self.embedding_dim_list
+        
+        self.rnn_params["input_size"] = x_train.shape[-1]
 
         # Initialize engine and optimizer
         self.engine = RNNArch(**self.rnn_params)

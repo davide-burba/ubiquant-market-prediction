@@ -123,10 +123,12 @@ class TensorPreprocessor(BasePreprocessor):
         scaler_targets_args={},
         crop_low=None,
         crop_high=None,
+        time_id_features_idx=[],
     ):
         self.fill_na_target = fill_na_target
         self.crop_low = crop_low
         self.crop_high = crop_high
+        self.time_id_features_idx = time_id_features_idx
 
         self.ts_scaler = TimeSeriesTensorScaler(
             scaler_features,
@@ -171,6 +173,9 @@ class TensorPreprocessor(BasePreprocessor):
         if copy:
             x = x.copy()
             y = y.copy()
+
+        x = self._add_time_features(x)
+
         x[np.isnan(x)] = 0
         if self.fill_na_target:
             y[np.isnan(y)] = 0
@@ -180,6 +185,23 @@ class TensorPreprocessor(BasePreprocessor):
         if self.crop_low is not None:
             y[y < self.crop_low] = self.crop_low
         return x, y
+
+    def _add_time_features(self, x):
+
+        if len(self.time_id_features_idx) == 0:
+            return x
+
+        # compute mean/std per timestep
+        time_x_mean = np.nanmean(x[:, :, self.time_id_features_idx], axis=0)
+        time_x_std = np.nanstd(x[:, :, self.time_id_features_idx], axis=0)
+        # reshape
+        time_x_mean = np.expand_dims(time_x_mean, axis=0)
+        time_x_std = np.expand_dims(time_x_std, axis=0)
+        time_x_mean = np.repeat(time_x_mean, x.shape[0], axis=0)
+        time_x_std = np.repeat(time_x_std, x.shape[0], axis=0)
+        # concat
+        x = np.concatenate([x, time_x_mean, time_x_std], axis=2)
+        return x
 
 
 class TimeSeriesTensorScaler:
