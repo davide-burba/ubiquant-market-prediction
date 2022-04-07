@@ -102,9 +102,9 @@ class MLPModel(BaseModel):
                 self.categories.append(cat_map)
                 self.num_embeddings_list.append(len(cat_map) + 1)
 
-            self.rnn_params["use_embedding"] = True
-            self.rnn_params["num_embeddings_list"] = self.num_embeddings_list
-            self.rnn_params["embedding_dim_list"] = self.embedding_dim_list
+            self.mlp_params["use_embedding"] = True
+            self.mlp_params["num_embeddings_list"] = self.num_embeddings_list
+            self.mlp_params["embedding_dim_list"] = self.embedding_dim_list
 
         self.mlp_params["input_size"] = x_train.shape[1]
 
@@ -186,8 +186,8 @@ class MLPModel(BaseModel):
             x = x.values
 
         self.engine.eval()
-        x = to_tensor(x)
         x = self._format_embedding(x)
+        x = to_tensor(x)
         pred = to_numpy(self.engine(x))
         self.engine.train()
 
