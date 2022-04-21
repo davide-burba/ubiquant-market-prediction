@@ -1,10 +1,14 @@
 from abc import abstractclassmethod
+from unittest.mock import Base
 import lightgbm as lgb
 import numpy as np
+import pandas as pd
+from sklearn.neural_network import MLPRegressor
 from torch.utils.data import DataLoader
 import torch
-from rnn import (
+from nn_commons import (
     RNNArch,
+    MLPArch,
     TimeSplitter,
     TensorLoader,
     to_numpy,
@@ -19,6 +23,8 @@ def get_model(model_type, model_args):
         "random": RandomModel,
         "lightgbm": LightGBMModel,
         "rnn": RNNModel,
+        "sklearn_mlp": MLPRegressor,
+        "mlp": MLPModel,
     }
     return models[model_type.lower()](**model_args)
 
@@ -41,7 +47,7 @@ class RandomModel(BaseModel):
         return np.random.normal(size=len(x))
 
 
-class LightGBMModel:
+class LightGBMModel(BaseModel):
     def __init__(self, categorical_feature="auto", **lightgbm_params):
         self.categorical_feature = categorical_feature
         self.lightgbm_params = lightgbm_params
@@ -60,7 +66,135 @@ class LightGBMModel:
         return self.engine.predict(x)
 
 
-class RNNModel:
+class MLPModel(BaseModel):
+    def __init__(
+        self,
+        mlp_params={},
+        objective="mae",
+        num_epochs=5,
+        batch_size=128,
+        learning_rate=1e-3,
+        weight_decay=0.01,
+        embedding_dim_list=None,
+        random_state=123,
+    ):
+        self.mlp_params = mlp_params
+        self.objective = objective
+        self.num_epochs = num_epochs
+        self.batch_size = batch_size
+        self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
+        self.embedding_dim_list = embedding_dim_list
+
+        torch.manual_seed(random_state)
+        np.random.seed(random_state)
+
+    def _set_architecture(self, x_train):
+
+        # manage embedding
+        if self.embedding_dim_list is not None:
+            self.categories = []
+            self.num_embeddings_list = []
+            for i, _ in enumerate(self.embedding_dim_list):
+                cat_map = {}
+                for cat_idx, cat in enumerate(sorted(np.unique(x_train[:, i]))):
+                    cat_map[cat] = cat_idx
+                self.categories.append(cat_map)
+                self.num_embeddings_list.append(len(cat_map) + 1)
+
+            self.mlp_params["use_embedding"] = True
+            self.mlp_params["num_embeddings_list"] = self.num_embeddings_list
+            self.mlp_params["embedding_dim_list"] = self.embedding_dim_list
+
+        self.mlp_params["input_size"] = x_train.shape[1]
+
+        # Initialize engine and optimizer
+        self.engine = MLPArch(**self.mlp_params)
+        self.optimizer = torch.optim.Adam(
+            self.engine.parameters(),
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay,
+        )
+
+    def _format_embedding(self, x):
+        if self.embedding_dim_list is None:
+            return x
+
+        n_embeddings = len(self.embedding_dim_list)
+        for i in range(n_embeddings):
+            cat_map = self.categories[i]
+            last = len(cat_map)
+            map_fun = lambda x: cat_map[x] if x in cat_map else last
+            map_fun = np.vectorize(map_fun)
+            x[:, i] = map_fun(x[:, i])
+
+        return x
+
+    def fit(self, x_train, y_train):
+
+        if isinstance(x_train, pd.DataFrame):
+            x_train = x_train.values
+
+        self._set_architecture(x_train)
+
+        x_train = self._format_embedding(x_train)
+
+        # Define the loader using x_train, y_train
+        loader = DataLoader(
+            dataset=TensorLoader(x_train, y_train),
+            batch_size=self.batch_size,
+            shuffle=True,
+            drop_last=False,
+        )
+
+        self.training_loss_value = []
+
+        for epoch in range(self.num_epochs):
+            print(f"epoch {epoch+1}/{self.num_epochs}")
+            epoch_loss_value = []
+
+            for x_batch, y_batch in loader:
+
+                pred = self.engine(x_batch)
+                assert y_batch.shape == pred.shape
+
+                if self.objective == "mae":
+                    loss_value = torch.mean(torch.abs(y_batch - pred))
+                elif self.objective == "mse":
+                    loss_value = torch.mean((y_batch - pred) ** 2)
+                elif self.objective == "corr":
+                    loss_value = corr_loss(y_batch, pred)
+                elif self.objective == "corr_exp":
+                    loss_value = corr_exp_loss(y_batch, pred)
+                else:
+                    raise ValueError(f"Unknown objective {self.objective}")
+
+                # Run the optimizer
+                self.optimizer.zero_grad()
+                loss_value.backward()
+                self.optimizer.step()
+                epoch_loss_value.append(loss_value.item())
+
+            # store the epoch loss
+            epoch_loss_value = np.mean(epoch_loss_value)
+            self.training_loss_value.append(epoch_loss_value)
+            print(f"Epoch loss: {epoch_loss_value:.4f}")
+
+    def predict(self, x):
+
+        if isinstance(x, pd.DataFrame):
+            x = x.values
+
+        self.engine.eval()
+        x = self._format_embedding(x)
+        x = to_tensor(x)
+        pred = to_numpy(self.engine(x))
+        self.engine.train()
+
+        return pred
+
+
+class RNNModel(BaseModel):
     def __init__(
         self,
         rnn_params,
@@ -68,10 +202,11 @@ class RNNModel:
         window_sizes=None,
         objective="mae",
         num_epochs=5,
-        batch_size=1,
+        batch_size=128,
         learning_rate=1e-3,
         weight_decay=0.01,
         embedding_dim_list=None,
+        stateful_pred=True,
         random_state=123,
     ):
 
@@ -82,13 +217,12 @@ class RNNModel:
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
+        self.embedding_dim_list = embedding_dim_list
         self.rnn_params = rnn_params
+        self.stateful_pred = stateful_pred
+
         torch.manual_seed(random_state)
         np.random.seed(random_state)
-
-        if embedding_dim_list is not None:
-            assert isinstance(embedding_dim_list, list)
-        self.embedding_dim_list = embedding_dim_list
 
     def _set_architecture(self, x_train):
 
@@ -106,6 +240,8 @@ class RNNModel:
             self.rnn_params["use_embedding"] = True
             self.rnn_params["num_embeddings_list"] = self.num_embeddings_list
             self.rnn_params["embedding_dim_list"] = self.embedding_dim_list
+        
+        self.rnn_params["input_size"] = x_train.shape[-1]
 
         # Initialize engine and optimizer
         self.engine = RNNArch(**self.rnn_params)
@@ -121,17 +257,17 @@ class RNNModel:
             return x
 
         n_embeddings = len(self.embedding_dim_list)
-        mask_all_zeros = x[:,:,n_embeddings:].sum(axis=2).sum(axis=1) == 0
+        mask_all_zeros = x[:, :, n_embeddings:].sum(axis=2).sum(axis=1) == 0
         for i in range(n_embeddings):
             cat_map = self.categories[i]
             last = len(cat_map)
             map_fun = lambda x: cat_map[x] if x in cat_map else last
             map_fun = np.vectorize(map_fun)
             x[:, :, i] = map_fun(x[:, :, i])
-            # if all features are zeros, it means we actually never saw 
+            # if all features are zeros, it means we actually never saw
             # values. in this case, we assign the last category
             x[mask_all_zeros] = last
-        
+
         return x
 
     def fit(self, x_train, y_train):
@@ -200,10 +336,10 @@ class RNNModel:
 
     def predict(self, x, x_past=None):
 
-        if x_past is not None:
-            _, h_state = self._predict(x_past)
-        else:
+        if x_past is None or not self.stateful_pred:
             h_state = None
+        else:
+            _, h_state = self._predict(x_past)
         y_pred, _ = self._predict(x, h_state)
         return y_pred
 

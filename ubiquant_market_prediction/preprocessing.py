@@ -1,4 +1,5 @@
 from abc import abstractclassmethod
+import pandas as pd
 import numpy as np
 import sklearn
 
@@ -32,8 +33,24 @@ class BasePreprocessor:
 
 
 class NaivePreprocessor(BasePreprocessor):
-    def __init__(self, cols_to_drop=[]):
+    def __init__(
+        self,
+        cols_to_drop=[],
+        scaler_features=None,
+        scaler_features_args={},
+        crop_low=None,
+        crop_high=None,
+        time_id_features=[],
+    ):
         self.cols_to_drop = cols_to_drop
+        self.crop_low = crop_low
+        self.crop_high = crop_high
+        if scaler_features is not None:
+            scaler_features = getattr(sklearn.preprocessing, scaler_features)(
+                **scaler_features_args
+            )
+        self.scaler_features = scaler_features
+        self.time_id_features = time_id_features
 
     def run(self, train_data, valid_data):
 
@@ -51,15 +68,48 @@ class NaivePreprocessor(BasePreprocessor):
         return self._run(valid_data)
 
     def run_train(self, train_data):
-        x_train = self._run(train_data)
+        x_train = self._run(train_data, fit_scaler=True)
         y_train = train_data.target.values
+
+        if self.crop_high is not None:
+            y_train[y_train > self.crop_high] = self.crop_high
+        if self.crop_low is not None:
+            y_train[y_train < self.crop_low] = self.crop_low
+
         return x_train, y_train
 
-    def _run(self, df):
+    def _run(self, df, fit_scaler=False):
+
+        if "time_id" not in df:
+            df["time_id"] = df.row_id.str.split("_", expand=True)[0].astype(int).values
+
+        df = self._add_time_features(df)
+
         cols_to_drop = ["row_id"] + self.cols_to_drop
         if "target" in df.columns:
             cols_to_drop.append("target")
-        return df.drop(columns=cols_to_drop)
+        df = df.drop(columns=cols_to_drop)
+
+        if self.scaler_features is not None:
+            if fit_scaler:
+                self.scaler_features.fit(df)
+            df = self.scaler_features.transform(df)
+        return df
+
+    def _add_time_features(self, df):
+        if len(self.time_id_features) == 0:
+            return df
+
+        dgb = df.groupby("time_id")[self.time_id_features]
+        dgb_mean = dgb.mean()
+        dgb_std = dgb.std()
+        dgb_mean.columns = [f"time_mean_{c}" for c in self.time_id_features]
+        dgb_std.columns = [f"time_std_{c}" for c in self.time_id_features]
+        dgb_mean.reset_index(inplace=True)
+        dgb_std.reset_index(inplace=True)
+        df = pd.merge(df, dgb_mean, how="left", on="time_id")
+        df = pd.merge(df, dgb_std, how="left", on="time_id")
+        return df
 
 
 class TensorPreprocessor(BasePreprocessor):
@@ -73,10 +123,12 @@ class TensorPreprocessor(BasePreprocessor):
         scaler_targets_args={},
         crop_low=None,
         crop_high=None,
+        time_id_features_idx=[],
     ):
         self.fill_na_target = fill_na_target
         self.crop_low = crop_low
         self.crop_high = crop_high
+        self.time_id_features_idx = time_id_features_idx
 
         self.ts_scaler = TimeSeriesTensorScaler(
             scaler_features,
@@ -121,6 +173,9 @@ class TensorPreprocessor(BasePreprocessor):
         if copy:
             x = x.copy()
             y = y.copy()
+
+        x = self._add_time_features(x)
+
         x[np.isnan(x)] = 0
         if self.fill_na_target:
             y[np.isnan(y)] = 0
@@ -130,6 +185,23 @@ class TensorPreprocessor(BasePreprocessor):
         if self.crop_low is not None:
             y[y < self.crop_low] = self.crop_low
         return x, y
+
+    def _add_time_features(self, x):
+
+        if len(self.time_id_features_idx) == 0:
+            return x
+
+        # compute mean/std per timestep
+        time_x_mean = np.nanmean(x[:, :, self.time_id_features_idx], axis=0)
+        time_x_std = np.nanstd(x[:, :, self.time_id_features_idx], axis=0)
+        # reshape
+        time_x_mean = np.expand_dims(time_x_mean, axis=0)
+        time_x_std = np.expand_dims(time_x_std, axis=0)
+        time_x_mean = np.repeat(time_x_mean, x.shape[0], axis=0)
+        time_x_std = np.repeat(time_x_std, x.shape[0], axis=0)
+        # concat
+        x = np.concatenate([x, time_x_mean, time_x_std], axis=2)
+        return x
 
 
 class TimeSeriesTensorScaler:

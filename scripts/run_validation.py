@@ -96,11 +96,12 @@ if __name__ == "__main__":
     for k,v in config["model"]["model_args"].items():
         if isinstance(v,dict):
             for kk,vv in v.items():
-                mlflow.log_param(kk,vv)
-        mlflow.log_param(k,v)
+                mlflow.log_param(kk,str(vv)[:250])
+        mlflow.log_param(k,str(v)[:250])
     
     mlflow.log_param("preprocessor_type", config["preprocessing"]["preprocessor_type"])
-    mlflow.log_params(config["preprocessing"]["preprocessor_args"])
+    for k,v in config["preprocessing"]["preprocessor_args"].items():
+        mlflow.log_param(k,str(v)[:250])
     mlflow.log_params(config["validator_args"])
 
 

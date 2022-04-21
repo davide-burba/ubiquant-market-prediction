@@ -1,0 +1,49 @@
+loading:
+  tensor_like: false
+model:
+  model_args:
+    bagging_fraction: 0.9
+    bagging_freq: 1
+    categorical_feature: null
+    feature_fraction: 1.0
+    histogram_pool_size: 3072
+    learning_rate: 0.05
+    min_data_in_leaf: 10
+    num_iterations: 500
+    num_leaves: 31
+    objective: l2
+    boosting: gbdt
+    lambda_l1: 1
+    lambda_l2: 3
+    seed: 123
+  model_type: lightgbm
+preprocessing:
+  preprocessor_args:
+    cols_to_drop:
+    - time_id
+    - investment_id
+    crop_high: 4
+    crop_low: -5
+    time_id_features:
+    - f_250
+    - f_265
+    - f_280
+    - f_270
+    - f_197
+    - f_65
+    - f_25
+    - f_155
+    - f_71
+    - f_15
+    - f_212
+    - f_179
+    - f_237
+    - f_297
+    - f_190
+    - f_76
+  preprocessor_type: naive
+validator_args:
+  n_folds: 3
+  n_timesteps_per_fold: 200
+  n_timesteps_to_train: 600
+  tensor_like: false
