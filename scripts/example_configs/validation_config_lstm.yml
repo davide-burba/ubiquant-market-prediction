@@ -1,0 +1,32 @@
+loading:
+  tensor_like: true
+model:
+  model_args:
+    batch_size: 128
+    embedding_dim_list: null
+    learning_rate: 0.002
+    num_epochs: 2
+    objective: corr
+    random_state: 123
+    rnn_params:
+      activation_type: leakyrelu
+      dropout_prob: 0.1
+      hidden_size: 64
+      num_layers: 3
+      rnn_type: LSTM
+    weight_decay: 0
+    window_sizes:
+    - 64
+  model_type: rnn
+preprocessing:
+  preprocessor_args:
+    crop_high: 5
+    crop_low: null
+    fill_na_target: true
+    scaler_features: null
+  preprocessor_type: tensor
+validator_args:
+  n_folds: 3
+  n_timesteps_per_fold: 200
+  n_timesteps_to_train: 600
+  tensor_like: true
